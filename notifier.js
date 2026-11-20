@@ -160,6 +160,32 @@ async function sendQuestEmbed(client, quest) {
     ? `https://cdn.discordapp.com/app-icons/${qConfig.application.id}/${appIcon}.png`
     : null;
 
+  // Reward thumbnail logic:
+  // - If reward is Orbs → attach local orbIcon.png and use it as thumbnail
+  // - Otherwise → use reward asset from Discord CDN
+  const firstReward = rewardsList[0] || {};
+  const firstRewardName = (firstReward.messages?.name || firstReward.messages?.name_with_article || "").toLowerCase();
+  const isOrbReward = firstRewardName.includes("orb");
+
+  let rewardThumbnailUrl = null;
+  let attachmentFile = null;
+
+  if (isOrbReward) {
+    const orbPath = path.join(__dirname, "emojis", "orbIcon.png");
+    if (fs.existsSync(orbPath)) {
+      attachmentFile = { attachment: orbPath, name: "orbIcon.png" };
+      rewardThumbnailUrl = "attachment://orbIcon.png";
+    }
+  } else {
+    // Try to get reward asset from CDN
+    const rewardAsset = firstReward.asset;
+    if (rewardAsset) {
+      rewardThumbnailUrl = `https://cdn.discordapp.com/assets/quests/${quest.id}/${rewardAsset}.png`;
+    } else if (iconUrl) {
+      rewardThumbnailUrl = iconUrl;
+    }
+  }
+
   // Build the embed
   const embed = new EmbedBuilder()
     .setTitle("! مهمة جديدة متاحة")
@@ -167,7 +193,7 @@ async function sendQuestEmbed(client, quest) {
     .setTimestamp();
 
   if (heroImageUrl) embed.setImage(heroImageUrl);
-  if (iconUrl) embed.setThumbnail(iconUrl);
+  if (rewardThumbnailUrl) embed.setThumbnail(rewardThumbnailUrl);
 
   // Main quest info as bold title then fields
   embed.setDescription(`**${questName}**`);
@@ -226,12 +252,16 @@ async function sendQuestEmbed(client, quest) {
   }
 
   try {
-    const msg = await channel.send({
+    const sendOptions = {
       content: content || undefined,
       embeds: [embed],
       components: [buttonsRow],
       allowedMentions: { parse: ["everyone", "roles", "users"] },
-    });
+    };
+    if (attachmentFile) {
+      sendOptions.files = [attachmentFile];
+    }
+    const msg = await channel.send(sendOptions);
 
     // Crosspost (publish) if announcement channel
     if (msg.crosspostable) {
