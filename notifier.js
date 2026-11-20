@@ -21,7 +21,7 @@ function getSentQuestIds() {
       const content = fs.readFileSync(SENT_FILE, "utf-8");
       return new Set(JSON.parse(content || "[]"));
     }
-  } catch {}
+  } catch { }
   return new Set();
 }
 
@@ -239,17 +239,8 @@ async function sendQuestEmbed(client, quest) {
       .setURL(config.websiteUrl),
   );
 
-  let content = "";
-  if (config.notificationRoleId) {
-    const r = config.notificationRoleId.trim();
-    if (r === "everyone" || r === "@everyone") {
-      content = "@everyone";
-    } else if (r === "here" || r === "@here") {
-      content = "@here";
-    } else {
-      content = `<@&${r.replace(/[^0-9]/g, "")}>`;
-    }
-  }
+  // Always ping with spoiler-style double mention
+  let content = "|| @here + @everyone ||";
 
   try {
     const sendOptions = {
@@ -265,7 +256,7 @@ async function sendQuestEmbed(client, quest) {
 
     // Crosspost (publish) if announcement channel
     if (msg.crosspostable) {
-      await msg.crosspost().catch(() => {});
+      await msg.crosspost().catch(() => { });
     }
 
     console.log(`✅ [NOTIFIER] تم إرسال إشعار المهمة الجديدة بنجاح: ${questName} (ID: ${quest.id})`);
