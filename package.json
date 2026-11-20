@@ -1,0 +1,16 @@
+{
+  "name": "quester-bot",
+  "version": "2.0.0",
+  "description": "Quester Discord Bot - Quests Notifier & Stream Spoofer",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3",
+    "ws": "^8.18.0"
+  }
+}
