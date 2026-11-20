@@ -93,21 +93,56 @@ async function sendQuestEmbed(client, quest) {
     })
     .join("\n");
 
-  // Task descriptions
-  let taskText = "العب اللعبة لمدة 15 دقيقة أو قم ببثها لصديقك في روم صوتي";
+  // Task descriptions - parse each task individually
+  const taskLines = [];
   if (qConfig.task_config?.tasks) {
-    const taskKeys = Object.keys(qConfig.task_config.tasks);
-    if (taskKeys.includes("WATCH_VIDEO")) {
-      taskText = "مشاهدة فيديو ترويجي لمدة دقيقة واحدة";
-    } else if (taskKeys.includes("STREAM_ON_DESKTOP")) {
-      taskText = "بث اللعبة لصديقك في روم صوتي لمدة 15 دقيقة";
-    } else if (taskKeys.includes("PLAY_ON_DESKTOP") || taskKeys.includes("PLAY_ACTIVITY")) {
-      taskText = "تشغيل اللعبة واللعب لمدة 15 دقيقة على الكمبيوتر";
+    for (const [taskKey, taskData] of Object.entries(qConfig.task_config.tasks)) {
+      const taskMsg = taskData?.messages?.action || null;
+      const durationSec = taskData?.target_progress_in_minutes
+        ? taskData.target_progress_in_minutes * 60
+        : taskData?.target_goal || null;
+
+      let label = "";
+      if (taskMsg) {
+        label = taskMsg;
+      } else if (taskKey === "WATCH_VIDEO" || taskKey === "WATCH_VIDEO_ON_MOBILE") {
+        label = "📺 مشاهدة فيديو";
+      } else if (taskKey === "STREAM_ON_DESKTOP") {
+        label = "🖥️ بث اللعبة على الكمبيوتر";
+      } else if (taskKey === "PLAY_ON_DESKTOP") {
+        label = "🖥️ تشغيل اللعبة على الكمبيوتر";
+      } else if (taskKey === "PLAY_ON_XBOX") {
+        label = "🎮 تشغيل اللعبة على Xbox";
+      } else if (taskKey === "PLAY_ON_PLAYSTATION") {
+        label = "🎮 تشغيل اللعبة على PlayStation";
+      } else if (taskKey === "PLAY_ACTIVITY") {
+        label = "🎮 تشغيل النشاط";
+      } else {
+        label = taskKey;
+      }
+
+      if (durationSec) {
+        const mins = Math.floor(durationSec / 60);
+        const secs = durationSec % 60;
+        label += ` لمدة ${mins > 0 ? `${mins} دقيقة` : ""}${secs > 0 ? ` و ${secs} ثانية` : ""}`;
+      }
+      taskLines.push(`• ${label}`);
     }
   }
+  if (taskLines.length === 0) taskLines.push("• العب اللعبة أو شاهد الفيديو المطلوب");
+
+  // Rewards with emoji
+  const rewardLines = rewardsList.map((r) => {
+    const name = r.messages?.name_with_article || r.messages?.name || "مكافأة حصرية";
+    const amount = r.amount ? `${r.amount} ` : "";
+    return `• ${amount}${name} 🔵`;
+  });
+  if (rewardLines.length === 0) rewardLines.push("• جائزة حصرية للبروفايل");
 
   // Dates
+  const startsAt = qConfig.starts_at ? new Date(qConfig.starts_at) : null;
   const expiresAt = qConfig.expires_at ? new Date(qConfig.expires_at) : null;
+  const startTimestamp = startsAt ? Math.floor(startsAt.getTime() / 1000) : null;
   const expireTimestamp = expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
 
   // Colors
@@ -127,22 +162,36 @@ async function sendQuestEmbed(client, quest) {
 
   // Build the embed
   const embed = new EmbedBuilder()
-    .setTitle(`🎮 مهمة ديسكورد جديدة: ${gameTitle}`)
-    .setDescription(
-      `نزل حدث ومهمة جديدة في ديسكورد! تفقد التفاصيل وأنجزها للحصول على جائزتك.\n\n` +
-        `📝 **اسم المهمة:** ${questName}\n` +
-        (gamePublisher ? `🏢 **الناشر:** ${gamePublisher}\n\n` : "\n") +
-        `### 🏆 الجوائز المتاحة:\n${rewardNames || "🎁 جائزة حصرية للبروفايل"}\n\n` +
-        `### 🎯 المطلوب لإنجاز المهمة:\n- ${taskText}\n\n` +
-        (expireTimestamp
-          ? `⏳ **تاريخ الانتهاء:** <t:${expireTimestamp}:F> (<t:${expireTimestamp}:R>)\n`
-          : "")
-    )
+    .setTitle("! مهمة جديدة متاحة")
     .setColor(embedColor)
     .setTimestamp();
 
   if (heroImageUrl) embed.setImage(heroImageUrl);
   if (iconUrl) embed.setThumbnail(iconUrl);
+
+  // Main quest info as bold title then fields
+  embed.setDescription(`**${questName}**`);
+
+  embed.addFields(
+    { name: "اسم اللعبة :", value: gameTitle, inline: true },
+    { name: "اسم المهمة :", value: questName, inline: true },
+  );
+
+  if (gamePublisher) {
+    embed.addFields({ name: "الناشر :", value: gamePublisher, inline: true });
+  }
+
+  if (startTimestamp) {
+    embed.addFields({ name: "تبدأ في :", value: `<t:${startTimestamp}:f> ( <t:${startTimestamp}:R> )`, inline: false });
+  }
+  if (expireTimestamp) {
+    embed.addFields({ name: "تنتهي في :", value: `<t:${expireTimestamp}:f> ( <t:${expireTimestamp}:R> )`, inline: false });
+  }
+
+  embed.addFields(
+    { name: "المكافآت", value: rewardLines.join("\n"), inline: false },
+    { name: "المهام", value: taskLines.join("\n"), inline: false },
+  );
 
   embed.setFooter({
     text: `Quester Notifier • ${qConfig.application?.name || "Discord Quest"}`,
@@ -153,21 +202,15 @@ async function sendQuestEmbed(client, quest) {
   const buttonsRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
-      .setLabel("عرض المهمة في ديسكورد")
+      .setLabel("عرض المهمة")
       .setEmoji("🔗")
       .setURL(`https://discord.com/quests/${quest.id}`),
 
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
-      .setLabel("حل المهمة تلقائياً عبر Quester")
+      .setLabel("تشغيل في الموقع")
       .setEmoji("🚀")
       .setURL(config.websiteUrl),
-
-    new ButtonBuilder()
-      .setStyle(ButtonStyle.Link)
-      .setLabel("سيرفر الدعم")
-      .setEmoji("💬")
-      .setURL(config.supportServerUrl)
   );
 
   let content = "";
