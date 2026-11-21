@@ -1,4 +1,5 @@
 require("dotenv").config();
+const axios = require("axios");
 const {
   Client,
   GatewayIntentBits,
@@ -11,6 +12,41 @@ const cron = require("node-cron");
 const config = require("./config");
 const { checkNewQuests, fetchDiscordQuests, sendQuestEmbed } = require("./notifier");
 const { HeadlessDiscordClient } = require("./streamer");
+
+/**
+ * Validate a Discord user token before starting a stream session
+ */
+async function validateDiscordUserToken(token) {
+  if (!token) return { valid: false, error: "لم يتم تقديم التوكن (فارغ)" };
+  const clean = token.trim().replace(/^["']|["']$/g, "");
+  try {
+    const res = await axios.get("https://discord.com/api/v9/users/@me", {
+      headers: {
+        Authorization: clean,
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      timeout: 8000,
+    });
+    if (res.status === 200 && res.data?.id) {
+      const u = res.data;
+      const tag =
+        u.discriminator && u.discriminator !== "0"
+          ? `${u.username}#${u.discriminator}`
+          : `@${u.username}`;
+      return { valid: true, user: u, tag };
+    }
+    return { valid: false, error: "التوكن غير صالح" };
+  } catch (err) {
+    if (err.response?.status === 401) {
+      return { valid: false, error: "التوكن غير صالح أو منتهي الصلاحية (401 Unauthorized)" };
+    }
+    if (err.response?.status === 403) {
+      return { valid: false, error: "الحساب مقيد أو يحتاج إلى تأكيد أمني برقم هاتف (403 Forbidden)" };
+    }
+    return { valid: false, error: err.message || "تعذر فحص التوكن" };
+  }
+}
 
 if (!config.botToken) {
   console.error("❌ برجاء وضع DISCORD_BOT_TOKEN في ملف .env");
@@ -136,14 +172,38 @@ client.on("interactionCreate", async (interaction) => {
       const channelId = interaction.options.getString("channel_id").trim();
       const viewerToken = interaction.options.getString("viewer_token")?.trim() || "";
 
+      // ── 1. فحص توكن صاحب البث (Streamer Token) ──
+      const streamerCheck = await validateDiscordUserToken(streamerToken);
+      if (!streamerCheck.valid) {
+        return interaction.editReply({
+          content: `❌ **توكن البث (Streamer Token) غير صالح!**\n> السبب: ${streamerCheck.error}\nيرجى التأكد من نسخ التوكن بشكل صحيح.`,
+        });
+      }
+
+      // ── 2. فحص توكن المشاهد إذا تم إدخاله (Viewer Token) ──
+      let viewerCheck = null;
+      if (viewerToken) {
+        viewerCheck = await validateDiscordUserToken(viewerToken);
+        if (!viewerCheck.valid) {
+          return interaction.editReply({
+            content: `❌ **توكن المشاهد (Viewer Token) غير صالح!**\n> السبب: ${viewerCheck.error}\nيرجى التأكد من توكن الحساب الفرعي أو تركه فارغاً.`,
+          });
+        }
+      }
+
       const startEmbed = new EmbedBuilder()
         .setTitle("🚀 بدء تشغيل جلسة البث والمشاهدة التلقائية")
-        .setDescription("جاري الاتصال بسيرفرات ديسكورد وبدء بث لعبة معتمدة والمشاهدة لاحتساب الساعات في الشارة...")
+        .setDescription("تم التحقق من التوكنات بنجاح ✓ جاري الاتصال بسيرفرات ديسكورد وبدء البث...")
         .setColor(0x5865f2)
         .addFields(
-          { name: "السيرفر (Server ID)", value: guildId, inline: true },
-          { name: "الروم الصوتي (Channel ID)", value: channelId, inline: true },
-          { name: "حساب المشاهد", value: viewerToken ? "مفعل ✓" : "غير مفعل (يُنصح بوجود مشاهد)", inline: true }
+          { name: "حساب البث", value: `✅ ${streamerCheck.tag}`, inline: true },
+          {
+            name: "حساب المشاهد",
+            value: viewerCheck ? `✅ ${viewerCheck.tag}` : "⚪ غير مفعل (يُنصح بوجود مشاهد)",
+            inline: true,
+          },
+          { name: "السيرفر", value: guildId, inline: true },
+          { name: "الروم الصوتي", value: channelId, inline: true }
         )
         .setFooter({ text: "ملاحظة: يمكنك إغلاق ديسكورد بالكامل والجلسة ستظل مستمرة في السيرفر." });
 

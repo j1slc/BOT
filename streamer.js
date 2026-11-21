@@ -193,7 +193,7 @@ class HeadlessDiscordClient {
           },
         })
       );
-    } catch {}
+    } catch { }
 
     setTimeout(() => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -225,7 +225,7 @@ class HeadlessDiscordClient {
     if (this.voiceWs) {
       try {
         this.voiceWs.close();
-      } catch {}
+      } catch { }
       this.voiceWs = null;
     }
     if (this.voiceHbTimer) {
@@ -388,7 +388,7 @@ class HeadlessDiscordClient {
     if (this.streamWs) {
       try {
         this.streamWs.close();
-      } catch {}
+      } catch { }
       this.streamWs = null;
     }
     if (this.streamHbTimer) {
@@ -533,10 +533,10 @@ class HeadlessDiscordClient {
 
     try {
       if (this.voiceWs) this.voiceWs.close();
-    } catch {}
+    } catch { }
     try {
       if (this.streamWs) this.streamWs.close();
-    } catch {}
+    } catch { }
 
     this.voiceWs = null;
     this.streamWs = null;
@@ -551,7 +551,7 @@ class HeadlessDiscordClient {
         if (this.isStreamer && this.streamKey) {
           try {
             this.ws.send(JSON.stringify({ op: 19, d: { stream_key: this.streamKey } }));
-          } catch {}
+          } catch { }
         }
         this.ws.send(
           JSON.stringify({
@@ -561,7 +561,7 @@ class HeadlessDiscordClient {
         );
         this.ws.close();
       }
-    } catch {}
+    } catch { }
 
     this.ws = null;
   }
