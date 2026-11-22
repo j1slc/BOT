@@ -102,24 +102,26 @@ async function sendQuestEmbed(client, quest) {
         ? taskData.target_progress_in_minutes * 60
         : taskData?.target_goal || null;
 
-      let label = "";
-      if (taskMsg) {
-        label = taskMsg;
-      } else if (taskKey === "WATCH_VIDEO" || taskKey === "WATCH_VIDEO_ON_MOBILE") {
-        label = "📺 مشاهدة فيديو";
-      } else if (taskKey === "STREAM_ON_DESKTOP") {
-        label = "🖥️ بث اللعبة على الكمبيوتر";
-      } else if (taskKey === "PLAY_ON_DESKTOP") {
-        label = "🖥️ تشغيل اللعبة على الكمبيوتر";
-      } else if (taskKey === "PLAY_ON_XBOX") {
-        label = "🎮 تشغيل اللعبة على Xbox";
-      } else if (taskKey === "PLAY_ON_PLAYSTATION") {
-        label = "🎮 تشغيل اللعبة على PlayStation";
-      } else if (taskKey === "PLAY_ACTIVITY") {
-        label = "🎮 تشغيل النشاط";
-      } else {
-        label = taskKey;
-      }
+      const fallbackEmoji = {
+        WATCH_VIDEO: "📺",
+        WATCH_VIDEO_ON_MOBILE: "📺",
+        STREAM_ON_DESKTOP: "🖥️",
+        PLAY_ON_DESKTOP: "🖥️",
+        PLAY_ACTIVITY: "🎮",
+      }[taskKey] || "🎮";
+      const emoji = (config.taskEmojis && config.taskEmojis[taskKey]) || fallbackEmoji;
+
+      const defaultText = {
+        WATCH_VIDEO: "مشاهدة فيديو",
+        WATCH_VIDEO_ON_MOBILE: "مشاهدة فيديو",
+        STREAM_ON_DESKTOP: "بث اللعبة على الكمبيوتر",
+        PLAY_ON_DESKTOP: "تشغيل اللعبة على الكمبيوتر",
+        PLAY_ON_XBOX: "تشغيل اللعبة على Xbox",
+        PLAY_ON_PLAYSTATION: "تشغيل اللعبة على PlayStation",
+        PLAY_ACTIVITY: "تشغيل النشاط",
+      }[taskKey];
+
+      let label = `${emoji} ${taskMsg || defaultText || taskKey}`;
 
       if (durationSec) {
         const mins = Math.floor(durationSec / 60);
